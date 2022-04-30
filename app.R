@@ -10,19 +10,20 @@ ui <- fluidPage(theme = shinytheme("yeti"),navbarPage("Reveals The Scams",
                              sidebarLayout(
                                  # Sidebar panel for inputs ----
                                  sidebarPanel(
-                                     # Input: Select a file ----
-                                     fileInput("file1", "Please select only csv files with following column order: reserved price and winning price",
+                                     fileInput("file1", "Please select only csv 
+                                               files with following column order: 
+                                               reserved price and winning price",
                                                multiple = FALSE,
-                                               accept = c("text/csv","text/comma-separated-values,text/plain",".csv")),
-                                     # Horizontal line ----
+                                               accept = c("text/csv",
+                                                          "text/comma-separated-values,text/plain",".csv")),
                                      tags$hr(),
-                                     # Input: Select number of rows to display ----
-                                     radioButtons("disp", "Display",choices = c(Head = "head",All = "all"),selected = "head"),
-                                     # Horizontal line ----
+                                     radioButtons("disp", "Display",choices = c(Head = "head",All = "all"),
+                                                  selected = "head"),
                                      tags$hr(),
-                                     # Submit: after uploading the data we should submit ----
                                      actionButton("submitbutton","Submit",icon("arrow-down"),width = 100),
                                      p("Click the button to check the bids"),
+                                     tags$hr(),
+                                     downloadButton("downloadData","Download", icon("download"), width = 200),
                                  ),
                              # Output:
                              mainPanel(
@@ -31,9 +32,7 @@ ui <- fluidPage(theme = shinytheme("yeti"),navbarPage("Reveals The Scams",
                              verbatimTextOutput('txt'),
                              tags$label(h3('Output')),
                              verbatimTextOutput('outputTxt'),
-                             imageOutput('imageOutput')),
-                             
-                    ),icon=icon("fa-solid fa-calculator")),
+                             imageOutput('imageOutput')),),icon=icon("fa-solid fa-calculator")),
                 tabPanel("About",
                          titlePanel("About"),
                          div(includeMarkdown("about.rmd")),
@@ -48,21 +47,13 @@ ui <- fluidPage(theme = shinytheme("yeti"),navbarPage("Reveals The Scams",
 server <- function(input, output,session) {
 
     output$contents <- renderTable({
-        
-        # input$file1 will be NULL initially. After the user selects
-        # and uploads a file, head of that data file by default,
-        # or all rows if selected, will be shown.
-        
         req(input$file1)
-        # when reading semicolon separated files,
-        # having a comma separator causes `read.csv` to error
         tryCatch(
             {
                 df <- read.csv(input$file1$datapath,
                                header = TRUE,sep = ",",quote = '"')
             },
             error = function(e) {
-                # return a safeError if a parsing error occurs
                 stop(safeError(e))
             }
         )
@@ -96,9 +87,7 @@ server <- function(input, output,session) {
         data2['ratio'] <- data2$winning_price/data2$reserved_price
         
         #Prepering data for clustering
-        names(data2)
-        NData <- data2[,-1]
-        NData <- na.omit(NData)
+        NData <- na.omit(data2)
         
         #Model based clustering
         clus1 <- Mclust(NData$ratio,G=2)
@@ -165,8 +154,25 @@ server <- function(input, output,session) {
                      alt = "rejected")} ,deleteFile = FALSE)
             return("Warning")}
         
-    })# End of Result plot
+    }) # End of Result plot
     
+    # Creating again cluster 2 for downloading
+    datasetInput <- reactive({
+      req(input$file1)
+      data2 <- read.csv(input$file1$datapath,
+                        header = TRUE,sep = ",",quote = '"')
+      colnames(data2) <- c('reserved_price','winning_price')
+      data2['ratio'] <- data2$winning_price/data2$reserved_price
+      NData <- na.omit(data2)
+      clus1 <- Mclust(NData$ratio,G=2)
+      t1 <- cbind(NData,Classification = clus1$classification)
+      NClus2 <- subset(t1,Classification == 2)
+      return(NClus2)
+    })
+    # Downloading cluster 2 into a csv file
+    output$downloadData <- downloadHandler(
+      filename = function() { paste0("cluster2_final.csv")},
+      content = function(file) {write.csv(datasetInput(), file,row.names = FALSE)})
 } # end of server
     
 # Create Shiny object
